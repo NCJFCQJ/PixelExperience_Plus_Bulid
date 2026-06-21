@@ -1,0 +1,45 @@
+name: PE13 Build K30 Ultra
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Setup dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git curl zip unzip python3
+
+      - name: Install repo tool
+        run: |
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod +x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Init PE source
+        run: |
+          mkdir pe && cd pe
+          repo init -u https://github.com/PixelExperience/manifest.git -b thirteen-plus
+
+      - name: Clone device trees
+        run: |
+          cd pe
+          git clone https://github.com/NCJFCQJ/android_device_xiaomi_cezanne device/xiaomi/cezanne
+          git clone https://github.com/NCJFCQJ/android_vendor_xiaomi_cezanne vendor/xiaomi/cezanne
+          git clone https://github.com/NCJFCQJ/android_kernel_xiaomi_mt6873 kernel/xiaomi/mt6873
+
+      - name: Sync source
+        run: |
+          cd pe
+          repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags
+
+      - name: Build ROM
+        run: |
+          cd pe
+          source build/envsetup.sh
+          lunch pixelexperience_k30ultra-userdebug
+          m bacon
