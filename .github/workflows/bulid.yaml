@@ -1,4 +1,4 @@
-name: PE13 Build K30 Ultra
+name: PixelExperience 13 Plus - cezanne build
 
 on:
   workflow_dispatch:
@@ -8,38 +8,65 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Setup dependencies
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
         run: |
           sudo apt update
-          sudo apt install -y git curl zip unzip python3
+          sudo apt install -y git curl wget zip unzip bc \
+            python3 python3-pip build-essential \
+            libssl-dev libncurses5-dev libxml2 libxml2-utils \
+            openjdk-11-jdk
 
-      - name: Install repo tool
+      - name: Setup repo tool
         run: |
           mkdir -p ~/bin
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-          chmod +x ~/bin/repo
+          chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Init PE source
+      - name: Initialize PixelExperience source
         run: |
           mkdir pe && cd pe
           repo init -u https://github.com/PixelExperience/manifest.git -b thirteen-plus
 
-      - name: Clone device trees
-        run: |
-          cd pe
-          git clone https://github.com/NCJFCQJ/android_device_xiaomi_cezanne device/xiaomi/cezanne
-          git clone https://github.com/NCJFCQJ/android_vendor_xiaomi_cezanne vendor/xiaomi/cezanne
-          git clone https://github.com/NCJFCQJ/android_kernel_xiaomi_mt6873 kernel/xiaomi/mt6873
-
       - name: Sync source
         run: |
           cd pe
-          repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags
+          repo sync -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+      - name: Clone device tree (cezanne)
+        run: |
+          cd pe/device/xiaomi
+          git clone https://github.com/NCJFCQJ/https://github.com/NCJFCQJ/android_device_xiaomi_cezanne.git pe || true
+
+      - name: Clone vendor blobs
+        run: |
+          cd pe/vendor/xiaomi
+          git clone https://github.com/NCJFCQJ/android_vendor_xiaomi_cezanne.git lineage-20-R-blob || true
+
+      - name: Clone kernel
+        run: |
+          cd pe/kernel/xiaomi
+          git clone https://github.com/NCJFCQJ/android_kernel_xiaomi_mt6873.git cgroup-v2 || true
+
+      - name: Setup build environment
+        run: |
+          cd pe
+          source build/envsetup.sh
+          lunch aosp_cezanne-userdebug
 
       - name: Build ROM
         run: |
           cd pe
           source build/envsetup.sh
-          lunch pixelexperience_k30ultra-userdebug
-          m bacon
+          lunch aosp_cezanne-userdebug
+          m bacon -j$(nproc --all)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelExperience13Plus-cezanne
+          path: |
+            pe/out/target/product/cezanne/*.zip
